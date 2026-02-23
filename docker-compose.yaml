@@ -1,0 +1,5 @@
+services:
+  blockme:
+    image: ghcr.io/t3ch404/blockme/blockme:latest
+    ports:
+      - 8080:8080

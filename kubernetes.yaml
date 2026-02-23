@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blockme-deployment
+spec:
+  selector:
+    matchLabels:
+      app: blockme
+  template:
+    metadata:
+      labels:
+        app: blockme
+    spec:
+      containers:
+        - name: blockme
+          image: ghcr.io/t3ch404/blockme/blockme:latest
+          ports:
+            - containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blockme-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+#  type: NodePort
+#  ports:
+#    - nodePort: 8080
+#      port: 8080
+#      protocol: TCP
+#      targetPort: 8080
+  selector:
+    app: blockme
