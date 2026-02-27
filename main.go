@@ -5,10 +5,14 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"os"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 var blockList []string
@@ -16,11 +20,22 @@ var blockList []string
 func main() {
 	fmt.Println("Setting up...")
 	router := mux.NewRouter()
+	err := godotenv.Load()
 
 	router.Use(LogRequestMiddleware, IpMiddleware, BlockCheckMiddleware)
 
 	router.HandleFunc("/", Home).Methods("GET")
 	router.HandleFunc("/blockme", BlockThem).Methods("POST")
+
+	IAmALittleBitchStr := os.Getenv("I_AM_A_LITTLE_BITCH")
+	IAmALittleBitch, err := strconv.ParseBool(IAmALittleBitchStr)
+	if err != nil {
+		IAmALittleBitch = false
+	}
+
+	if IAmALittleBitch {
+		router.HandleFunc("/reset", ResetThem).Methods("GET")
+	}
 
 	port := 8080
 	server := &http.Server{
@@ -31,7 +46,7 @@ func main() {
 	}
 
 	fmt.Printf("Starting server on port %d\n", port)
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		fmt.Printf("The server didn't start... %s\n", err.Error())
 	}
@@ -62,12 +77,24 @@ func BlockThem(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func ResetThem(w http.ResponseWriter, r *http.Request) {
+	resetIpIndex := slices.Index(blockList, r.RemoteAddr)
+
+	if resetIpIndex != -1 {
+		blockList = slices.Delete(blockList, resetIpIndex, resetIpIndex+1)
+	}
+	http.Redirect(w, r, "/", http.StatusPermanentRedirect)
+}
+
 func IpMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse X-Forwarded-For header to net.IP
 		theirIPStr := r.Header.Get("X-Forwarded-For")
 		if theirIPStr == "" {
-			http.Error(w, "Your IP wasn't included in your request. Figure it out", http.StatusBadRequest)
+			theirIPStr = r.RemoteAddr
+			errMsg := fmt.Sprintf("X-Forwarded-For header is empty, going with IP %s", r.RemoteAddr)
+			fmt.Printf("%s\n", errMsg)
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -85,8 +112,16 @@ func IpMiddleware(next http.Handler) http.Handler {
 
 func BlockCheckMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "reset") {
+			next.ServeHTTP(w, r)
+		}
 		if slices.Contains(blockList, r.RemoteAddr) {
 			w.WriteHeader(http.StatusForbidden)
+			_, err := w.Write([]byte("You are blocked!"))
+			if err != nil {
+				fmt.Printf("main.BlockCheckMiddleware: could not write to response body: %s\n", err.Error())
+			}
+
 			return
 		}
 		next.ServeHTTP(w, r)
