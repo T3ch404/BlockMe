@@ -1,39 +1,47 @@
 package main
 
 import (
+	"BlockMe/config"
+	"BlockMe/cron"
+	"context"
+	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"slices"
-	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 )
 
 var blockList []string
+var resetKey string
 
 func main() {
 	fmt.Println("Setting up...")
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	config.InitConfig()
+
 	router := mux.NewRouter()
-	err := godotenv.Load()
+
+	resetKeyPtr := &resetKey
+	cronConfig := cron.JobConfig{ResetKey: resetKeyPtr}
+	c := cron.InitCronJobs(&cronConfig)
 
 	router.Use(LogRequestMiddleware, IpMiddleware, BlockCheckMiddleware)
 
 	router.HandleFunc("/", Home).Methods("GET")
 	router.HandleFunc("/blockme", BlockThem).Methods("POST")
 
-	IAmALittleBitchStr := os.Getenv("I_AM_A_LITTLE_BITCH")
-	IAmALittleBitch, err := strconv.ParseBool(IAmALittleBitchStr)
-	if err != nil {
-		IAmALittleBitch = false
-	}
-
-	if IAmALittleBitch {
+	if config.Env.IAmALittleBitch {
 		router.HandleFunc("/reset", ResetThem).Methods("GET")
 	}
 
@@ -45,11 +53,29 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 	}
 
-	fmt.Printf("Starting server on port %d\n", port)
-	err = server.ListenAndServe()
+	go func() {
+		fmt.Printf("\nStarting server on port %d\n", port)
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("The web server failed to start... %s\n", err.Error())
+		}
+	}()
+
+	<-sigs
+	fmt.Printf("\nReceived termination signal. Starting graceful shutdown.\n")
+
+	fmt.Println("Stopping the cron jobs...")
+	c.Stop()
+
+	fmt.Println("Stopping web server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := server.Shutdown(ctx)
 	if err != nil {
-		fmt.Printf("The server didn't start... %s\n", err.Error())
+		log.Fatalf("The web server failed to shut down gracefully... %s\n", err.Error())
 	}
+
+	fmt.Println("\nServer gracefully stopped")
 }
 
 func Home(w http.ResponseWriter, r *http.Request) {
@@ -78,10 +104,15 @@ func BlockThem(w http.ResponseWriter, r *http.Request) {
 }
 
 func ResetThem(w http.ResponseWriter, r *http.Request) {
-	resetIpIndex := slices.Index(blockList, r.RemoteAddr)
+	requestResetKey := r.URL.Query().Get("resetKey")
+	fmt.Printf("requestResetKey: %s resetKey %s\n", requestResetKey, resetKey)
+	if requestResetKey == resetKey {
+		fmt.Printf("Valid reset key, removing %s from the blockList\n", r.RemoteAddr)
+		resetIpIndex := slices.Index(blockList, r.RemoteAddr)
 
-	if resetIpIndex != -1 {
-		blockList = slices.Delete(blockList, resetIpIndex, resetIpIndex+1)
+		if resetIpIndex != -1 {
+			blockList = slices.Delete(blockList, resetIpIndex, resetIpIndex+1)
+		}
 	}
 	http.Redirect(w, r, "/", http.StatusPermanentRedirect)
 }
@@ -112,10 +143,9 @@ func IpMiddleware(next http.Handler) http.Handler {
 
 func BlockCheckMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "reset") {
-			next.ServeHTTP(w, r)
-		}
-		if slices.Contains(blockList, r.RemoteAddr) {
+		if strings.Contains(r.URL.String(), "reset") {
+			fmt.Printf("reset link, skipping block check\n")
+		} else if slices.Contains(blockList, r.RemoteAddr) {
 			w.WriteHeader(http.StatusForbidden)
 			_, err := w.Write([]byte("You are blocked!"))
 			if err != nil {
