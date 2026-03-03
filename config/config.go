@@ -9,6 +9,7 @@ import (
 )
 
 type EnvConfig struct {
+	EnableDB   bool
 	DbType     string
 	DbHost     string
 	DbPort     string
@@ -30,6 +31,11 @@ func InitConfig() {
 	godotenv.Load()
 
 	fmt.Printf("config: Initializing DB values\n")
+	enableDbStr := os.Getenv("ENABLE_DB")
+	enableDb, err := strconv.ParseBool(enableDbStr)
+	if err != nil {
+		enableDb = false
+	}
 	dbType := os.Getenv("DB_TYPE")
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
@@ -60,6 +66,7 @@ func InitConfig() {
 	}
 
 	config := EnvConfig{
+		EnableDB:   enableDb,
 		DbType:     dbType,
 		DbHost:     dbHost,
 		DbPort:     dbPort,
