@@ -16,6 +16,8 @@ type EnvConfig struct {
 	DbUser     string
 	DbPassword string
 
+	EnableCron bool
+
 	IAmALittleBitch     bool
 	IAmALittleBitchCron string
 	IAmALittleBitchUrl  string
@@ -34,6 +36,13 @@ func InitConfig() {
 	dbName := os.Getenv("DB_NAME")
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
+
+	fmt.Printf("config: Initializing Cron values\n")
+	enableCronStr := os.Getenv("ENABLE_CRON")
+	enableCron, err := strconv.ParseBool(enableCronStr)
+	if err != nil {
+		enableCron = false
+	}
 
 	fmt.Printf("config: Initializing reset values\n")
 	iAmALittleBitchStr := os.Getenv("I_AM_A_LITTLE_BITCH")
@@ -57,6 +66,8 @@ func InitConfig() {
 		DbName:     dbName,
 		DbUser:     dbUser,
 		DbPassword: dbPassword,
+
+		EnableCron: enableCron,
 
 		IAmALittleBitch:     iAmALittleBitch,
 		IAmALittleBitchCron: iAmALittleBitchCron,

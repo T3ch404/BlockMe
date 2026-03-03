@@ -11,6 +11,7 @@ import (
 	"github.com/netresearch/go-cron"
 )
 
+type Cron = cron.Cron
 type JobConfig struct {
 	ResetKey *string
 }

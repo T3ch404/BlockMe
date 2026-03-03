@@ -32,9 +32,13 @@ func main() {
 
 	router := mux.NewRouter()
 
-	resetKeyPtr := &resetKey
-	cronConfig := cron.JobConfig{ResetKey: resetKeyPtr}
-	c := cron.InitCronJobs(&cronConfig)
+	var c *cron.Cron
+
+	if config.Env.EnableCron {
+		resetKeyPtr := &resetKey
+		cronConfig := cron.JobConfig{ResetKey: resetKeyPtr}
+		c = cron.InitCronJobs(&cronConfig)
+	}
 
 	router.Use(LogRequestMiddleware, IpMiddleware, BlockCheckMiddleware)
 
@@ -63,8 +67,10 @@ func main() {
 	<-sigs
 	fmt.Printf("\nReceived termination signal. Starting graceful shutdown.\n")
 
-	fmt.Println("Stopping the cron jobs...")
-	c.Stop()
+	if c != nil {
+		fmt.Println("Stopping the cron jobs...")
+		c.Stop()
+	}
 
 	fmt.Println("Stopping web server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
