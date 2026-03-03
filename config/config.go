@@ -12,7 +12,7 @@ type EnvConfig struct {
 	EnableDB   bool
 	DbType     string
 	DbHost     string
-	DbPort     string
+	DbPort     int
 	DbName     string
 	DbUser     string
 	DbPassword string
@@ -26,62 +26,109 @@ type EnvConfig struct {
 
 var Env *EnvConfig
 
-func InitConfig() {
-	fmt.Printf("\nInitializing config...\n")
-	godotenv.Load()
+func initEnv() error {
+	fmt.Printf("config: Initializing env\n")
+	err := godotenv.Load()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("config: Building singleton\n")
+	config := EnvConfig{}
 
 	fmt.Printf("config: Initializing DB values\n")
-	enableDbStr := os.Getenv("ENABLE_DB")
-	enableDb, err := strconv.ParseBool(enableDbStr)
-	if err != nil {
-		enableDb = false
+	config.EnableDB = getEnvBool("ENABLE_DB", false, false)
+	if config.EnableDB {
+		config.DbType = getEnvString("DB_TYPE", false, "")
+		config.DbHost = getEnvString("DB_HOST", false, "")
+		config.DbPort = getEnvInt("DB_PORT", false, -1)
+		config.DbName = getEnvString("DB_NAME", false, "")
+		config.DbUser = getEnvString("DB_USER", false, "")
+		config.DbPassword = getEnvString("DB_PASSWORD", false, "")
+	} else {
+		fmt.Printf("config: DB disabled\n")
 	}
-	dbType := os.Getenv("DB_TYPE")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
 
 	fmt.Printf("config: Initializing Cron values\n")
-	enableCronStr := os.Getenv("ENABLE_CRON")
-	enableCron, err := strconv.ParseBool(enableCronStr)
-	if err != nil {
-		enableCron = false
-	}
+	config.EnableCron = getEnvBool("ENABLE_CRON", false, false)
 
-	fmt.Printf("config: Initializing reset values\n")
-	iAmALittleBitchStr := os.Getenv("I_AM_A_LITTLE_BITCH")
-	iAmALittleBitch, err := strconv.ParseBool(iAmALittleBitchStr)
-	if err != nil {
-		iAmALittleBitch = false
-	}
-	iAmALittleBitchCron := os.Getenv("I_AM_A_LITTLE_BITCH_CRON")
-	if iAmALittleBitchCron == "" {
-		iAmALittleBitchCron = "1 * * * *"
-	}
-	iAmALittleBitchUrl := os.Getenv("I_AM_A_LITTLE_BITCH_WEBHOOK_URL")
-	if iAmALittleBitch && iAmALittleBitchUrl == "" {
-		fmt.Println("config: WARNING, reset has been enabled without a webhook for key rotation")
-	}
-
-	config := EnvConfig{
-		EnableDB:   enableDb,
-		DbType:     dbType,
-		DbHost:     dbHost,
-		DbPort:     dbPort,
-		DbName:     dbName,
-		DbUser:     dbUser,
-		DbPassword: dbPassword,
-
-		EnableCron: enableCron,
-
-		IAmALittleBitch:     iAmALittleBitch,
-		IAmALittleBitchCron: iAmALittleBitchCron,
-		IAmALittleBitchUrl:  iAmALittleBitchUrl,
+	if config.EnableCron {
+		fmt.Printf("config: Initializing reset values\n")
+		iAmALittleBitch := getEnvBool("I_AM_A_LITTLE_BITCH", false, false)
+		iAmALittleBitchCron := getEnvString("I_AM_A_LITTLE_BITCH_CRON", false, "")
+		if iAmALittleBitchCron == "" {
+			iAmALittleBitchCron = "1 * * * *"
+		}
+		iAmALittleBitchUrl := getEnvString("I_AM_A_LITTLE_BITCH_WEBHOOK_URL", false, "")
+		if iAmALittleBitch && iAmALittleBitchUrl == "" {
+			fmt.Println("config: WARNING, reset has been enabled without a webhook for key rotation")
+		}
+	} else {
+		fmt.Printf("config: Cron disabled\n")
 	}
 
 	Env = &config
 
 	fmt.Printf("config: Env initialized\n")
+	return nil
+}
+
+func ReloadConfig() error {
+	fmt.Printf("\nReloading config...\n")
+	Env = nil
+	return initEnv()
+}
+
+func InitConfig() error {
+	fmt.Printf("\nInitializing config...\n")
+	if Env != nil {
+		fmt.Printf("\nEnv config already initialized. Skipping.\n")
+		return nil
+	}
+	return initEnv()
+}
+
+func getEnvString(key string, required bool, defaultValue string) string {
+	strVal := os.Getenv(key)
+	if strVal == "" {
+		if required {
+			panic(fmt.Sprintf("ERROR: Missing required environment variable: %s", key))
+		}
+		return defaultValue
+	}
+	return strVal
+}
+
+func getEnvInt(key string, required bool, defaultValue int) int {
+	strVal := os.Getenv(key)
+	if strVal == "" {
+		if required {
+			panic(fmt.Sprintf("ERROR: Missing required environment variable: %s", key))
+		}
+		return defaultValue
+	}
+
+	i, err := strconv.Atoi(strVal)
+	if err != nil {
+		fmt.Printf("config: WARNING, env var %s is not an integer. Setting to -1\n", key)
+		return -1
+	}
+	return i
+}
+
+func getEnvBool(key string, required, defaultValue bool) bool {
+	strVal := os.Getenv(key)
+	if strVal == "" {
+		if required {
+			panic(fmt.Sprintf("ERROR: Missing required environment variable: %s", key))
+		}
+		return defaultValue
+	}
+
+	bVal, err := strconv.ParseBool(strVal)
+	if err != nil {
+		fmt.Printf("config: WARNING, env var %s is not a boolean. Setting to false\n", key)
+		return false
+	}
+	return bVal
 }
