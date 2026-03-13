@@ -1,7 +1,11 @@
 # Configuration
-Configuration is done through environment variables. The following subsections detail how to configure BlockMe to work in your environment.
+Configuration is done through environment variables. The following subsections 
+detail how to configure BlockMe to work in your environment.
 
 ## Database
+Setting up a database enabled persistent IP storage to ensure that blocked IPs 
+stay blocked.
+
 **DB_TYPE** | `postgres` or `sqlite` | Default: `sqlite`  
 > Choosing Postgres makes DB_HOST, DB_PORT, DB_NAME, DB_USER, & DB_PASS required 
 > in order to connect to your postgres database. Sqlite database files are 
@@ -32,6 +36,9 @@ Configuration is done through environment variables. The following subsections d
 > DB_PASS is specified.
 
 ## Reset
+The reset functionality allows user's to unblock themselves with a generated 
+UUID.
+
 **I_AM_A_LITTLE_BITCH** | `true` or `false` | Default: `false`
 > Setting I_AM_A_LITTLE_BITCH to `true` enables the reset functionality.
 
@@ -40,3 +47,10 @@ Configuration is done through environment variables. The following subsections d
 
 **I_AM_A_LITTLE_BITCH_WEBHOOK_URL** | Existing webhook URL (Discord) | Default: None
 > Defines where reset tokens will be sent to.
+
+## Misc
+
+**IGNORE_LIST** | Comma separated list of IPs | Default: ""
+> Adding an IP address to the IGNORE_LIST environment variable prevents that IP 
+> from being blocked. All other logic works the same, and BlockMe will still 
+> return a "blocked" message but the address will not be added to the block list

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -106,12 +107,17 @@ func Home(w http.ResponseWriter, r *http.Request) {
 }
 
 func BlockThem(w http.ResponseWriter, r *http.Request) {
-	sqlStatement := `INSERT INTO ip_blocklist (ip, timestamp) VALUES ($1, $2)`
-	_, err := to.DB.Exec(sqlStatement, r.RemoteAddr, time.Now().UTC())
-	if err != nil {
-		fmt.Printf("Error executing insert statement: %s\n", err.Error())
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+	// Only block the address if it is not in the ignore list
+	if !slices.Contains(config.Env.IgnoreList, r.RemoteAddr) {
+		sqlStatement := `INSERT INTO ip_blocklist (ip, timestamp) VALUES ($1, $2)`
+		_, err := to.DB.Exec(sqlStatement, r.RemoteAddr, time.Now().UTC())
+		if err != nil {
+			fmt.Printf("Error executing insert statement: %s\n", err.Error())
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		fmt.Printf("Ignoring block request for %s - IP is included in the IGNORE_LIST\n", r.RemoteAddr)
 	}
 
 	w.WriteHeader(http.StatusCreated)

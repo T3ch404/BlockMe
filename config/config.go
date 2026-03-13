@@ -3,7 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -21,6 +23,8 @@ type EnvConfig struct {
 	IAmALittleBitch     bool
 	IAmALittleBitchCron string
 	IAmALittleBitchUrl  string
+
+	IgnoreList []string
 }
 
 var Env *EnvConfig
@@ -28,7 +32,7 @@ var ErrMissingRequiredEnvVar = errors.New("missing required config")
 
 func InitConfig() error {
 	fmt.Printf("\nInitializing config...\n")
-	godotenv.Load()
+	_ = godotenv.Load()
 
 	fmt.Printf("config: Initializing DB values\n")
 	dbType := strings.ToLower(os.Getenv("DB_TYPE"))
@@ -84,6 +88,18 @@ func InitConfig() error {
 		fmt.Println("config: WARNING, reset has been enabled without a webhook for key rotation")
 	}
 
+	// Remove all chars not in the regex, split on commas, and parse each list item as an IP
+	re := regexp.MustCompile("[^0-9.,]")
+	ignoreListStr := os.Getenv("IGNORE_LIST")
+	ignoreListStr = re.ReplaceAllString(ignoreListStr, "")
+	var ignoreList []string
+	for _, ignore := range strings.Split(ignoreListStr, ",") {
+		addr := net.ParseIP(ignore)
+		if addr != nil {
+			ignoreList = append(ignoreList, addr.String())
+		}
+	}
+
 	config := EnvConfig{
 		DbType: dbType,
 		DbHost: dbHost,
@@ -95,6 +111,8 @@ func InitConfig() error {
 		IAmALittleBitch:     iAmALittleBitch,
 		IAmALittleBitchCron: iAmALittleBitchCron,
 		IAmALittleBitchUrl:  iAmALittleBitchUrl,
+
+		IgnoreList: ignoreList,
 	}
 
 	Env = &config
