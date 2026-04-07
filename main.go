@@ -3,6 +3,7 @@ package main
 import (
 	"BlockMe/config"
 	"BlockMe/cron"
+	"BlockMe/to"
 	"context"
 	"errors"
 	"fmt"
@@ -20,7 +21,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var blockList []string
 var resetKey string
 
 func main() {
@@ -28,22 +28,28 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	config.InitConfig()
+	err := config.InitConfig()
+	if err != nil {
+		fmt.Printf("Error initializing config: %s\n", err.Error())
+		os.Exit(1)
+	}
 
-	router := mux.NewRouter()
+	err = to.Setup()
+	if err != nil {
+		fmt.Printf("Error setting up the database connection: %s\n", err.Error())
+		os.Exit(1)
+	}
 
 	resetKeyPtr := &resetKey
 	cronConfig := cron.JobConfig{ResetKey: resetKeyPtr}
 	c := cron.InitCronJobs(&cronConfig)
 
+	router := mux.NewRouter()
 	router.Use(LogRequestMiddleware, IpMiddleware, BlockCheckMiddleware)
 
 	router.HandleFunc("/", Home).Methods("GET")
 	router.HandleFunc("/blockme", BlockThem).Methods("POST")
-
-	if config.Env.IAmALittleBitch {
-		router.HandleFunc("/reset", ResetThem).Methods("GET")
-	}
+	router.HandleFunc("/reset", ResetThem).Methods("GET")
 
 	port := 8080
 	server := &http.Server{
@@ -70,9 +76,15 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := server.Shutdown(ctx)
+	err = server.Shutdown(ctx)
 	if err != nil {
 		log.Fatalf("The web server failed to shut down gracefully... %s\n", err.Error())
+	}
+
+	fmt.Println("Closing the database connection...")
+	err = to.DB.Close()
+	if err != nil {
+		fmt.Printf("Error closing the database connection: %s\n", err.Error())
 	}
 
 	fmt.Println("\nServer gracefully stopped")
@@ -95,7 +107,19 @@ func Home(w http.ResponseWriter, r *http.Request) {
 }
 
 func BlockThem(w http.ResponseWriter, r *http.Request) {
-	blockList = append(blockList, r.RemoteAddr)
+	// Only block the address if it is not in the ignore list
+	if !slices.Contains(config.Env.IgnoreList, r.RemoteAddr) {
+		sqlStatement := `INSERT INTO ip_blocklist (ip, timestamp) VALUES ($1, $2)`
+		_, err := to.DB.Exec(sqlStatement, r.RemoteAddr, time.Now().UTC())
+		if err != nil {
+			fmt.Printf("Error executing insert statement: %s\n", err.Error())
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		fmt.Printf("Ignoring block request for %s - IP is included in the IGNORE_LIST\n", r.RemoteAddr)
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	// idc if they see the blocked message or not - Ignore errors
 	_, _ = fmt.Fprintf(w, "Blocked!")
@@ -104,14 +128,22 @@ func BlockThem(w http.ResponseWriter, r *http.Request) {
 }
 
 func ResetThem(w http.ResponseWriter, r *http.Request) {
+	if !config.Env.IAmALittleBitch {
+		fmt.Println("Reset endpoint is not enabled")
+		http.Redirect(w, r, "/", http.StatusPermanentRedirect)
+		return
+	}
+
 	requestResetKey := r.URL.Query().Get("resetKey")
 	fmt.Printf("requestResetKey: %s resetKey %s\n", requestResetKey, resetKey)
 	if requestResetKey == resetKey {
 		fmt.Printf("Valid reset key, removing %s from the blockList\n", r.RemoteAddr)
-		resetIpIndex := slices.Index(blockList, r.RemoteAddr)
 
-		if resetIpIndex != -1 {
-			blockList = slices.Delete(blockList, resetIpIndex, resetIpIndex+1)
+		sqlStatement := `DELETE FROM ip_blocklist WHERE ip = ?`
+		_, err := to.DB.Exec(sqlStatement, r.RemoteAddr)
+		if err != nil {
+			fmt.Printf("Error executing delete statement: %s\n", err.Error())
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	}
 	http.Redirect(w, r, "/", http.StatusPermanentRedirect)
@@ -122,7 +154,7 @@ func IpMiddleware(next http.Handler) http.Handler {
 		// Parse X-Forwarded-For header to net.IP
 		theirIPStr := r.Header.Get("X-Forwarded-For")
 		if theirIPStr == "" {
-			theirIPStr = r.RemoteAddr
+			r.RemoteAddr = strings.Split(r.RemoteAddr, ":")[0]
 			errMsg := fmt.Sprintf("X-Forwarded-For header is empty, going with IP %s", r.RemoteAddr)
 			fmt.Printf("%s\n", errMsg)
 			next.ServeHTTP(w, r)
@@ -143,15 +175,17 @@ func IpMiddleware(next http.Handler) http.Handler {
 
 func BlockCheckMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip block check on reset requests
 		if strings.Contains(r.URL.String(), "reset") {
 			fmt.Printf("reset link, skipping block check\n")
-		} else if slices.Contains(blockList, r.RemoteAddr) {
-			w.WriteHeader(http.StatusForbidden)
-			_, err := w.Write([]byte("You are blocked!"))
-			if err != nil {
-				fmt.Printf("main.BlockCheckMiddleware: could not write to response body: %s\n", err.Error())
-			}
+			next.ServeHTTP(w, r)
+		}
 
+		var exists bool
+		sqlStatement := `SELECT EXISTS (SELECT 1 FROM ip_blocklist WHERE ip = $1)`
+		err := to.DB.QueryRow(sqlStatement, r.RemoteAddr).Scan(&exists)
+		if err == nil && exists {
+			w.WriteHeader(http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)
