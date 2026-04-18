@@ -11,19 +11,14 @@ import (
 	"github.com/netresearch/go-cron"
 )
 
-type JobConfig struct {
-	ResetKey *string
-}
+var ResetKey *string
 
-var resetKey *string
-
-func InitCronJobs(jobConfig *JobConfig) *cron.Cron {
+func InitCronJobs() *cron.Cron {
 	fmt.Println("\nInitializing cron jobs...")
 	c := cron.New()
-	resetKey = jobConfig.ResetKey
 
-	fmt.Printf("cron: adding ResetKeyRotator cron job with schedule %s\n", config.Env.IAmALittleBitchCron)
-	_, err := c.AddFunc(config.Env.IAmALittleBitchCron, resetKeyRotator)
+	fmt.Printf("cron: adding ResetKeyRotator cron job with schedule %s\n", config.Env.ResetMeCron)
+	_, err := c.AddFunc(config.Env.ResetMeCron, resetKeyRotator)
 	if err != nil {
 		fmt.Printf("cron: Failed to add ResetKeyRotator cron job. %s\n", err.Error())
 	}
@@ -36,13 +31,13 @@ func InitCronJobs(jobConfig *JobConfig) *cron.Cron {
 func resetKeyRotator() {
 	fmt.Println("cron.resetKeyRotator: Creating new resetKey...")
 	newKey := uuid.New().String()
-	*resetKey = newKey
-	fmt.Printf("cron.resetKeyRotator: New resetKey created: %s\n", *resetKey)
+	ResetKey = &newKey
+	fmt.Printf("cron.resetKeyRotator: New resetKey created: %s\n", ResetKey)
 
 	fmt.Println("cron.resetKeyRotator: Sending resetKey to discord")
 
 	payload := map[string]interface{}{
-		"content": fmt.Sprintf("New resetKey: %s\n\nhttp://localhost:8080/reset?resetKey=%s", *resetKey, *resetKey),
+		"content": fmt.Sprintf("New resetKey: %s\n\nhttp://localhost:8080/reset?resetKey=%s", ResetKey, ResetKey),
 	}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
@@ -50,7 +45,7 @@ func resetKeyRotator() {
 	}
 
 	resp, err := http.Post(
-		config.Env.IAmALittleBitchUrl,
+		config.Env.ResetMeWebhook,
 		"application/json",
 		bytes.NewBuffer(jsonPayload),
 	)

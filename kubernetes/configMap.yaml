@@ -4,6 +4,9 @@ metadata:
   name: blockme-config
   namespace: blockme
 data:
+  LOG_FORMAT: "json"
+  LOG_LEVEL: "INFO"
+  LOG_LOCATION: "console"
   DB_TYPE: "sqlite"
-  I_AM_A_LITTLE_BITCH: "false"
-  I_AM_A_LITTLE_BITCH_CRON: "1 * * * *"
+  RESET_ME: "false"
+  IGNORE_LIST: "127.0.0.1"
