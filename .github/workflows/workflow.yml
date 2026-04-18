@@ -22,7 +22,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/t3ch404/blockme
+          images: ghcr.io/t3ch404/blockme/blockme:latest
           tags: |
             type=sha,format=short
             type=raw,value=latest
@@ -31,6 +31,5 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: |
-            ghcr.io/t3ch404/blockme:${{ env.SHORT_SHA }}
-            ghcr.io/t3ch404/blockme:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
