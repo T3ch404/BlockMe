@@ -22,7 +22,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/t3ch404/blockme/blockme:latest
+          images: ghcr.io/t3ch404/blockme/blockme
           tags: |
             type=sha,format=short
             type=raw,value=latest
