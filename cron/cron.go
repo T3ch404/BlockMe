@@ -17,8 +17,8 @@ func InitCronJobs() *cron.Cron {
 	fmt.Println("\nInitializing cron jobs...")
 	c := cron.New()
 
-	fmt.Printf("cron: adding ResetKeyRotator cron job with schedule %s\n", config.Env.IAmALittleBitchCron)
-	_, err := c.AddFunc(config.Env.IAmALittleBitchCron, resetKeyRotator)
+	fmt.Printf("cron: adding ResetKeyRotator cron job with schedule %s\n", config.Env.ResetMeCron)
+	_, err := c.AddFunc(config.Env.ResetMeCron, resetKeyRotator)
 	if err != nil {
 		fmt.Printf("cron: Failed to add ResetKeyRotator cron job. %s\n", err.Error())
 	}
@@ -45,7 +45,7 @@ func resetKeyRotator() {
 	}
 
 	resp, err := http.Post(
-		config.Env.IAmALittleBitchUrl,
+		config.Env.ResetMeWebhook,
 		"application/json",
 		bytes.NewBuffer(jsonPayload),
 	)

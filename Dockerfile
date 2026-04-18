@@ -15,6 +15,10 @@ RUN GOOS=linux CGO_ENABLED=1 go build -a -o ./bin main.go
 FROM alpine:3.19
 # Copy binary executable to the runner container
 
+RUN addgroup -S blockme -g 1000 && adduser -S blockme -G blockme -u 1000 -D
+
+USER blockme
+
 WORKDIR /app/
 
 COPY --from=builder /code/bin .

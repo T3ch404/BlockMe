@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"BlockMe/config"
 	"BlockMe/to"
 	"context"
 	"fmt"
@@ -101,19 +102,27 @@ func LogRequestMiddleware(next http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		slog.LogAttrs(
-			r.Context(),
-			slog.LevelInfo,
-			"request",
-			slog.String("source", theirIpStr),
-			slog.String("method", r.Method),
-			slog.String("url_path", r.URL.String()),
-			slog.Int("response_code", customWriter.StatusCode),
-			slog.String("start", start.Format(time.RFC3339)),
-			slog.String("duration", duration.String()),
-		)
+		if config.Env.LogFormat == "text_pretty" || config.Env.LogLocation == "file" {
+			// Simple human-readable logging when LOG_FORMAT is text_pretty or slog is going to file
+			fmt.Printf("%s\t%s\t%s\t%d\t%s\n", theirIpStr, r.Method, r.URL.String(), customWriter.StatusCode, duration.String())
+		}
 
-		fmt.Printf("%s\t%s\t%s\t%d\t%s\n", theirIpStr, r.Method, r.URL.String(), customWriter.StatusCode, duration.String())
+		if config.Env.LogFormat != "text_pretty" {
+			slog.LogAttrs(
+				r.Context(),
+				slog.LevelInfo,
+				"request",
+				slog.String("source", theirIpStr),
+				slog.String("method", r.Method),
+				slog.String("host", r.Host),
+				slog.String("path", r.URL.String()),
+				slog.Int("response_code", customWriter.StatusCode),
+				slog.String("start", start.Format(time.RFC3339)),
+				slog.String("duration", duration.String()),
+				slog.String("user_agent", r.UserAgent()),
+				slog.Int("bytes", int(r.ContentLength)),
+			)
+		}
 	})
 }
 

@@ -72,7 +72,7 @@ func ResetThem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !config.Env.IAmALittleBitch {
+	if !config.Env.ResetMe {
 		fmt.Println("Reset endpoint is not enabled")
 		http.Redirect(w, r, "/", http.StatusPermanentRedirect)
 		return

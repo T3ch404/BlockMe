@@ -2,6 +2,24 @@
 Configuration is done through environment variables. The following subsections 
 detail how to configure BlockMe to work in your environment.
 
+## Logging
+Logging configurations allow users to define how and where log messages are 
+output
+
+**LOG_FORMAT** | `text_pretty`, `text`, `json` | Default: `text_pretty`
+> Defines the format to output requests logs in. text_pretty is for console 
+> logging only and outputs request logs in a nice human-readable format. 'text' 
+> and 'json' output log data into a format that is better for automated log 
+> collection
+
+**LOG_LEVEL** | `DEBUG`, `INFO`, `WARNING`, `ERROR` | Default: `INFO`
+> Set the level of log verbosity
+
+**LOG_LOCATION** | `console` or `file` | Default: `console`
+> Set the location to output log files to. 'console' outputs to the standard 
+> output, and 'file' outputs to ./blockme.log. NOTE: Setting LOG_FORMAT to 
+> 'text_pretty' will always output to the standards output (console)
+
 ## Database
 Setting up a database enabled persistent IP storage to ensure that blocked IPs 
 stay blocked.
@@ -39,13 +57,13 @@ stay blocked.
 The reset functionality allows user's to unblock themselves with a generated 
 UUID.
 
-**I_AM_A_LITTLE_BITCH** | `true` or `false` | Default: `false`
-> Setting I_AM_A_LITTLE_BITCH to `true` enables the reset functionality.
+**RESET_ME** | `true` or `false` | Default: `false`
+> Setting RESET_ME to `true` enables the reset functionality.
 
-**I_AM_A_LITTLE_BITCH_CRON** | Five field Cron schedule | Default: `1 * * * *`
+**RESET_ME_CRON** | Five field Cron schedule | Default: `1 * * * *`
 > Defines how often the reset token is rotated and sent to the webhook.
 
-**I_AM_A_LITTLE_BITCH_WEBHOOK_URL** | Existing webhook URL (Discord) | Default: None
+**RESET_ME_WEBHOOK** | Existing webhook URL (Discord) | Default: None
 > Defines where reset tokens will be sent to.
 
 ## Misc

@@ -13,6 +13,10 @@ import (
 )
 
 type EnvConfig struct {
+	LogFormat   string
+	LogLevel    string
+	LogLocation string
+
 	DbType string
 	DbHost string
 	DbPort int
@@ -20,9 +24,9 @@ type EnvConfig struct {
 	DbUser string
 	DbPass string
 
-	IAmALittleBitch     bool
-	IAmALittleBitchCron string
-	IAmALittleBitchUrl  string
+	ResetMe        bool
+	ResetMeCron    string
+	ResetMeWebhook string
 
 	IgnoreList []string
 }
@@ -33,6 +37,23 @@ var ErrMissingRequiredEnvVar = errors.New("missing required config")
 func InitConfig() error {
 	fmt.Printf("\nInitializing config...\n")
 	_ = godotenv.Load()
+
+	fmt.Println("config: Initializing Logging configs")
+	logFormat := os.Getenv("LOG_FORMAT")
+	if logFormat != "text_pretty" && logFormat != "text" && logFormat != "json" {
+		fmt.Println("config: Invalid LOG_FORMAT - Continuing with text_pretty")
+		logFormat = "text_pretty"
+	}
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel != "DEBUG" && logLevel != "INFO" && logLevel != "WARNING" && logLevel != "ERROR" {
+		fmt.Println("config: Invalid LOG_LEVEL - Continuing with INFO")
+		logLevel = "INFO"
+	}
+	logLocation := os.Getenv("LOG_LOCATION")
+	if logLocation != "console" && logLocation != "file" {
+		fmt.Println("config: Invalid LOG_LOCATION - Continuing with console")
+		logLocation = "console"
+	}
 
 	fmt.Printf("config: Initializing DB values\n")
 	dbType := strings.ToLower(os.Getenv("DB_TYPE"))
@@ -74,27 +95,27 @@ func InitConfig() error {
 	}
 
 	fmt.Printf("config: Initializing reset values\n")
-	iAmALittleBitchStr := os.Getenv("I_AM_A_LITTLE_BITCH")
-	iAmALittleBitch, err := strconv.ParseBool(iAmALittleBitchStr)
+	resetMeStr := os.Getenv("RESET_ME")
+	resetMe, err := strconv.ParseBool(resetMeStr)
 	if err != nil {
-		fmt.Println("config: Invalid or missing I_AM_A_LITTLE_BITCH - Continuing with default false")
-		iAmALittleBitch = false
+		fmt.Println("config: Invalid or missing RESET_ME - Continuing with default false")
+		resetMe = false
 	}
 	var (
-		iAmALittleBitchCron string
-		iAmALittleBitchUrl  string
+		resetMeCron    string
+		resetMeWebhook string
 	)
 
-	if iAmALittleBitch {
-		iAmALittleBitchCron = os.Getenv("I_AM_A_LITTLE_BITCH_CRON")
-		if iAmALittleBitchCron == "" {
-			fmt.Println("config: Invalid or missing I_AM_A_LITTLE_BITCH_CRON - Continuing with default '1 * * * *")
-			iAmALittleBitchCron = "1 * * * *"
+	if resetMe {
+		resetMeCron = os.Getenv("RESET_ME_CRON")
+		if resetMeCron == "" {
+			fmt.Println("config: Invalid or missing RESET_ME_CRON - Continuing with default '1 * * * *")
+			resetMeCron = "1 * * * *"
 		}
-		iAmALittleBitchUrl = os.Getenv("I_AM_A_LITTLE_BITCH_WEBHOOK_URL")
-		if iAmALittleBitchUrl == "" {
-			fmt.Println("config: Missing I_AM_A_LITTLE_BITCH_WEBHOOK_URL while I_AM_A_LITTLE_BITCH is enabled - Disabling I_AM_A_LITTLE_BITCH")
-			iAmALittleBitch = false
+		resetMeWebhook = os.Getenv("RESET_ME_WEBHOOK")
+		if resetMeWebhook == "" {
+			fmt.Println("config: Missing RESET_ME_WEBHOOK while RESET_ME is enabled - Disabling RESET_ME")
+			resetMe = false
 		}
 	}
 
@@ -111,6 +132,10 @@ func InitConfig() error {
 	}
 
 	config := EnvConfig{
+		LogFormat:   logFormat,
+		LogLevel:    logLevel,
+		LogLocation: logLocation,
+
 		DbType: dbType,
 		DbHost: dbHost,
 		DbPort: dbPort,
@@ -118,9 +143,9 @@ func InitConfig() error {
 		DbUser: dbUser,
 		DbPass: dbPass,
 
-		IAmALittleBitch:     iAmALittleBitch,
-		IAmALittleBitchCron: iAmALittleBitchCron,
-		IAmALittleBitchUrl:  iAmALittleBitchUrl,
+		ResetMe:        resetMe,
+		ResetMeCron:    resetMeCron,
+		ResetMeWebhook: resetMeWebhook,
 
 		IgnoreList: ignoreList,
 	}

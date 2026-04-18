@@ -26,25 +26,23 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	err := logger.Init()
+	err := config.InitConfig()
+	if err != nil {
+		log.Fatalf("Error initializing config: %s", err.Error())
+	}
+
+	err = logger.Init()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = config.InitConfig()
-	if err != nil {
-		fmt.Printf("Error initializing config: %s", err.Error())
-		os.Exit(1)
-	}
-
 	err = to.Setup()
 	if err != nil {
-		fmt.Printf("Error setting up the database connection: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("Error setting up the database connection: %s\n", err.Error())
 	}
 
 	var c *cron.Cron
-	if config.Env.IAmALittleBitch {
+	if config.Env.ResetMe {
 		c = bm_cron.InitCronJobs()
 	}
 
