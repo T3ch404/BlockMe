@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,13 +33,13 @@ func main() {
 
 	err = config.InitConfig()
 	if err != nil {
-		slog.Error("Error initializing config", "error", err)
+		fmt.Printf("Error initializing config: %s", err.Error())
 		os.Exit(1)
 	}
 
 	err = to.Setup()
 	if err != nil {
-		slog.Error("Error setting up the database connection", "error", err)
+		fmt.Printf("Error setting up the database connection: %s\n", err.Error())
 		os.Exit(1)
 	}
 
