@@ -2,7 +2,7 @@ name: Build
 on:
   push:
     branches:
-      - main
+      - Push-Commits-Here
 
 permissions:
   contents: read
